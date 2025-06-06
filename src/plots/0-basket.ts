@@ -1,20 +1,23 @@
 import { featureCollection, lineString } from "@turf/helpers";
 import * as turf from "@turf/turf";
 import type { LineString } from "../utils/utils";
-import z from "zod";
-import _ from 'lodash'
+import z from "zod/v4";
+import _, { clone } from 'lodash'
+import LSystem from 'lindenmayer'
+import type { Position } from "geojson";
+
 // const createUtil = (zodSchema)=>(params:z.infer<typeof zodSchema>)=>{
 
 // }
 const lineMergeSchema = z.object({
-    lines: z.ZodType<LineString>()
+    lines: z.object()
 })
-const lineMerge = (params: z.infer<typeof lineMergeSchema>)=>{
-    let {lines} = lineMergeSchema.parse(params)
-    let properties = lines.reduce((acc,item)=>{
-        return {...acc, ...(item.properties||{})}
-    },{})
-    let geometry = lineString(features.flatMap(g=>g.geometry.coordinates), properties)
+const lineMerge = (params: z.infer<typeof lineMergeSchema>) => {
+    let { lines } = lineMergeSchema.parse(params)
+    let properties = lines.reduce((acc, item) => {
+        return { ...acc, ...(item.properties || {}) }
+    }, {})
+    let geometry = lineString(features.flatMap(g => g.geometry.coordinates), properties)
     return geometry
 }
 // const subsampleSchema = {
@@ -32,25 +35,25 @@ const BballNetParams = z.object({
     m: z.number().optional().default(0.15),
     n: z.number().optional().default(0.25),
     totalSlices: z.number().optional().default(12),
-    lenStraight:z.number().optional().default(4),
-    height:z.number().optional().default(0.5)
+    lenStraight: z.number().optional().default(4),
+    height: z.number().optional().default(0.5)
 })
 
 // const bezierSpline = (line, {resolution, sharpness})=>{
 // }
-const bballNet = (params: z.infer<typeof BballNetParams>)=>{
+const bballNet = (params: z.infer<typeof BballNetParams>) => {
     params = BballNetParams.parse(params)
-    const {radius,m,n,totalSlices,lenStraight,height} = params
+    const { radius, m, n, totalSlices, lenStraight, height } = params
     // TODO: no es fiable
-    const curve =  turf.bezierSpline(lineString([[1,1],[5,5], [3,5]]), {
+    const curve = turf.bezierSpline(lineString([[1, 1], [5, 5], [3, 5]]), {
         // resolution: 10000
     })
     const line = lineString([
-        [-n/3,-n/lenStraight],
-        [0,0]
+        [-n / 3, -n / lenStraight],
+        [0, 0]
     ])
     // return curve
-    let lineMerged = lineMerge(line,curve)
+    let lineMerged = lineMerge(line, curve)
     return lineMerged
     // lineMerged = turf.transformTranslate(lineMerged, 500, 50)
 
@@ -59,7 +62,7 @@ const bballNet = (params: z.infer<typeof BballNetParams>)=>{
     // x_dist = c-a
     // y_dist = d-b
     // w_line,h_line = shu.size(line)
-    
+
     // p = lineMerge([l,sh.affinity.translate(sh.affinity.scale(l, -1, 1),x_dist)])
     // w,h = shu.size(p)
     // scale_prop = radius/w
@@ -89,23 +92,110 @@ const bballNet = (params: z.infer<typeof BballNetParams>)=>{
     // line2 = LineString([list(list(first_line.geoms)[0].coords)[-1],list(list(last_line.geoms)[0].coords)[0]])
     // mergers_entre_lips += [line, line2]
 }
-export default ()=>{
-    let feature = lineString( [
+const translate = (geojson: LineString, xDelta=0, yDelta=0, {mutate}: {mutate?:boolean} ={})=>{
+    if (mutate === false || mutate === undefined) geojson = clone(geojson);
+    turf.coordEach(geojson, function(pointCoords){
+        pointCoords[0] = pointCoords[0]+xDelta
+        pointCoords[1] = pointCoords[1]+yDelta
+    })
+    return geojson
+}
+const scale = (geojson: LineString, scaleX=1, scaleY=1, {mutate}: {mutate?:boolean} ={})=>{
+    if (mutate === false || mutate === undefined) geojson = clone(geojson);
+    turf.coordEach(geojson, function(pointCoords){
+        pointCoords[0] = pointCoords[0]*scaleX
+        pointCoords[1] = pointCoords[1]*scaleY
+    })
+    return geojson
+}
+const rotate = (geojson: LineString, angle=0, {pivot, mutate}:{pivot?:[number, number]|Position, mutate?:boolean} = {})=>{
+    if (mutate === false || mutate === undefined) geojson = clone(geojson);
+    const pivotCoord = pivot? (Array.isArray(pivot)? turf.point(pivot): pivot) : turf.centroid(geojson);
+    turf.coordEach(geojson, function(pointCoords){
+        // Translate point to origin
+        const translatedX = pointCoords[0] - pivotCoord.geometry.coordinates[0];
+        const translatedY = pointCoords[1] - pivotCoord.geometry.coordinates[1];
+         // Rotate the point
+        const rotatedX = translatedX * Math.cos(angle) - translatedY * Math.sin(angle);
+        const rotatedY = translatedX * Math.sin(angle) + translatedY * Math.cos(angle);
+
+        // Translate back
+        const finalX = rotatedX +  pivotCoord.geometry.coordinates[0];
+        const finalY = rotatedY + pivotCoord.geometry.coordinates[1];   
+        pointCoords[0] = finalX
+        pointCoords[1] = finalY
+    })
+    return geojson
+}
+const createKoch = () => {
+    var rotationRelative = 0
+    let pointer = [0,0]
+    let allLs: LineString[] = []
+    var koch = new LSystem({
+        axiom: 'F++F++F',
+        productions: { 'F': 'F-F++F-F' },
+        finals: {
+            '+': () => {
+                rotationRelative += (Math.PI / 180) * 60
+            },
+            '-': () => {
+                rotationRelative -= (Math.PI / 180) * 60
+            },
+            'F': () => {
+                let ls = lineString([
+                    [0, 0],
+                    [0, 4 / (koch.iterations + 1)]
+                ])
+                let lsTranslated = translate(ls, pointer[0], pointer[1])
+                // debugger
+                let lsRotated = rotate(lsTranslated, rotationRelative, {pivot:ls.geometry.coordinates[0], })
+                // debugger
+                pointer = lsRotated.geometry.coordinates[1]
+                allLs.push(lsRotated)
+            }
+        }
+    })
+    koch.iterate(4)
+    koch.final()
+    return scale(featureCollection(allLs),0.25, 0.25)
+    
+}
+export const plot = () => {
+    let feature = lineString([
         [0, 0],
         [0, 1],
         [1, 1],
         [1, 0],
         [0, 0]
     ])
+    let feature2 = lineString([
+        [1, 1],
+        [1, 2],
+        [2, 2],
+        [2, 1],
+        [1, 1]
+    ])
+    let feature3 = createKoch()
     feature.properties = {
         lineWidth: 0.1,
-		strokeStyle: "blue",
+        strokeStyle: "blue",
     }
-    let feature2 = turf.bezierSpline(feature,)
+    // let feature2 = turf.bezierSpline(feature,)
     let collections = featureCollection([
         feature,
-        bballNet({})
+        // bballNet({})
+        feature2,
+        feature3
     ])
     return collections
 }
 export const schema = {}
+export const config = {
+    dimensions: "a5",
+    pixelsPerInch: 200,
+    units: "cm"
+}
+export default {
+    config,
+    plot
+}
