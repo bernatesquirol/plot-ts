@@ -3,7 +3,7 @@ import {plot} from './plots/0-basket'
 // import { CodeShapeUtil } from './CodeShape'
 // import * as tldrawUtils from './utils/tldrawUtils'
 // import { Tldraw } from 'tldraw'
-import * as utils from './utils/utils'
+import * as utils from './utils/plotUtils'
 import canvasSketch from 'canvas-sketch';
 import * as sketchUtils from './utils/sketchUtils'
 import * as tldrawUtils from './utils/tldrawUtils'
@@ -14,7 +14,8 @@ import { HelperButton } from './components/HelperButton';
 const settings = {
 	dimensions: "a5",
 	pixelsPerInch: 200,
-	units: "cm"
+	units: "cm",
+	orientation: "landscape"
 }
 
 
@@ -53,8 +54,8 @@ const TldrawRenderer = ()=>{
 export default function App() {
 	
 	return (
-		// <SketchRenderer/>
-		<TldrawRenderer/>
+		<SketchRenderer/>
+		// <TldrawRenderer/>
 	)
 }
 {/* <Tldraw shapeUtils={customShape}

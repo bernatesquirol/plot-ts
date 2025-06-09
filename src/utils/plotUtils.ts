@@ -7,12 +7,25 @@ export type Point = ReturnType<typeof point>
 export type Points = ReturnType<typeof points>
 export type Plottable = FeatureCollection | Feature | LineString | LineStrings | Point | Points
 export type Plot = (...args: any)=>Plottable
+export type Vector = [number,number]|number[]
 
 
+export const newArray = (lengthArray:number, value:number=1)=>{
+    return (new Array(lengthArray)).fill(value)
+}
 
-
-
-
+const createMovementCoords = (coordinates:any[])=>{
+    return coordinates.map((c,i)=>{
+        let val:any = null
+        if (i==0){
+            val = {type:"moveTo", value:c}
+        }else{
+            val = {type:"lineTo", value:c}
+        }
+        // ls.values.push(val)
+        return val
+    })
+}
 export const plot2instruct = (plot:Plottable, properties={}, depth=0)=>{
     let returnList: any[] = []
     let propertiesInherit = {...properties, ...(plot.properties||{})}
@@ -21,17 +34,17 @@ export const plot2instruct = (plot:Plottable, properties={}, depth=0)=>{
     }else if (plot.type==="Feature"){
         returnList = [...returnList, ...plot2instruct(plot.geometry, propertiesInherit, depth+1)]
     }else if (plot.type==="LineString"){
-        let ls = {properties, values:[]}
-        plot.coordinates.map((c,i)=>{
-            let val:any = null
-            if (i==0){
-                val = {type:"moveTo", value:c}
-            }else{
-                val = {type:"lineTo", value:c}
-            }
-            ls.values.push(val)
-        })
+        let values = createMovementCoords(plot.coordinates)
+        let ls = {properties, values}
         returnList.push(ls)
+        
+    }else if (plot.type==="Polygon"){
+        plot.coordinates.forEach(coords=>{
+            let values = createMovementCoords(coords)
+            let ls = {properties, values}
+            returnList.push(ls)
+        })
+        
         
     }
     return returnList

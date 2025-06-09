@@ -1,14 +1,41 @@
 import { featureCollection, lineString } from "@turf/helpers";
 import * as turf from "@turf/turf";
-import type { LineString } from "../utils/utils";
+import { newArray, type LineString, type Plottable, type Vector } from "../utils/plotUtils";
 import z from "zod/v4";
-import _, { clone } from 'lodash'
+import _ from 'lodash'
 import LSystem from 'lindenmayer'
 import type { Position } from "geojson";
+import * as tu from '../utils/turfUtils'
+import * as pu from '../utils/plotUtils'
+// import * as prob from 'probability-distributions';
+import seedrandom from 'seedrandom';
+import * as ss from 'simple-statistics'
+import {Image} from 'image-js'
+const rng = seedrandom('my-seed');
+// const oldRandom = Math.random;
+// Math.random = rng;
+function normalSample(mu = 0, sigma = 1) {
+    const u1 = Math.random();
+    const u2 = Math.random();
+    const z0 = Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
+    return mu + z0 * sigma;
+}
 
-// const createUtil = (zodSchema)=>(params:z.infer<typeof zodSchema>)=>{
+// const unirand = require('unirand')
+const listSummingUpTo = (total:number, n:number, sample=()=>Math.random())=>{
+    let distribution = newArray(n).map(()=>sample())
+    let sum = distribution.reduce((acc,i)=>acc+i,0)
+    distribution = distribution.map(i=>total*i/sum)
+    return distribution
+}
+const cumsum = (arrayToSum:number[])=>{
+    let total = 0
+    return arrayToSum.map(i=>{
+        total += i
+        return total
+    })
 
-// }
+}
 const lineMergeSchema = z.object({
     lines: z.object()
 })
@@ -38,7 +65,69 @@ const BballNetParams = z.object({
     lenStraight: z.number().optional().default(4),
     height: z.number().optional().default(0.5)
 })
+const createUnequalCuts = (line,)=>{
+    
+}
+const translateChunks = (line: LineString, amplitude:number, cuts:number|number[], randomGenerator?: (i?:number)=>number)=>{
+    // let lineNormalVectorResult = lineNormalVector(line);
+    let lineNormalVectorResult = [1,0]
+    let angle = tu.angleBetween( lineNormalVectorResult, tu.lineToVector(line),)
+    if (!randomGenerator) randomGenerator = ()=>Math.random()
+    return tu.iterateChunks(line, cuts, (subline, i, list)=>{
+        let amplitudeChunk = (randomGenerator(i)*amplitude)-amplitude/2
+        let newSl = subline
+        let centroid = turf.centroid(subline)
+        if (i==0){
+            centroid = turf.point(subline.coordinates[0])
+        }else if (i==list.length-1){
+            centroid = turf.point(subline.coordinates[subline.coordinates.length-1])
+        }
+        newSl =tu.rotate(subline, -angle, {pivot: centroid})
+        // newSl = tu.translate(newSl as any, lineNormalVectorResult[0]*amplitudeChunk, lineNormalVectorResult[1]*amplitudeChunk)
+        if (i>0 && i<list.length-1){
+            newSl = tu.translate(newSl, 0, amplitudeChunk)
+        }
+        let scaleFactor = Math.cos(angle)
+        newSl = tu.scale(newSl,scaleFactor,scaleFactor, {pivot:centroid})
+        return newSl
+    })
+}
+// const gradient = (, orientation)=>{
 
+// }
+// const z = (x,y)=>{
+//     return turf.distance([x,y], [0,0], {units:'degrees'})
+// }
+const iterGrid = (n:number, m:number, func: (x:number,y:number)=>pu.Plottable, resolution=1)=>{
+    let gridReturn: pu.Plottable[][] = []
+    let i = 0
+    while (i<n){
+        let j = 0
+        let rowReturn: pu.Plottable[] = []
+        while (j<m){
+            rowReturn.push(func(i,j))
+            j += resolution
+        }
+        gridReturn.push(rowReturn)
+        i += resolution
+    }
+    
+    return gridReturn
+}
+// TODO profunditat en textures: grid
+const com = ()=>{
+    
+}
+const pine = ()=>{
+    return tu.ellipse([10,10],0.1,0.1)
+    return lineString([
+        [0, 0],
+        [0, 1],
+        [1, 1],
+        [1, 0],
+        [0, 0]
+    ])
+}
 // const bezierSpline = (line, {resolution, sharpness})=>{
 // }
 const bballNet = (params: z.infer<typeof BballNetParams>) => {
@@ -92,41 +181,6 @@ const bballNet = (params: z.infer<typeof BballNetParams>) => {
     // line2 = LineString([list(list(first_line.geoms)[0].coords)[-1],list(list(last_line.geoms)[0].coords)[0]])
     // mergers_entre_lips += [line, line2]
 }
-const translate = (geojson: LineString, xDelta=0, yDelta=0, {mutate}: {mutate?:boolean} ={})=>{
-    if (mutate === false || mutate === undefined) geojson = clone(geojson);
-    turf.coordEach(geojson, function(pointCoords){
-        pointCoords[0] = pointCoords[0]+xDelta
-        pointCoords[1] = pointCoords[1]+yDelta
-    })
-    return geojson
-}
-const scale = (geojson: LineString, scaleX=1, scaleY=1, {mutate}: {mutate?:boolean} ={})=>{
-    if (mutate === false || mutate === undefined) geojson = clone(geojson);
-    turf.coordEach(geojson, function(pointCoords){
-        pointCoords[0] = pointCoords[0]*scaleX
-        pointCoords[1] = pointCoords[1]*scaleY
-    })
-    return geojson
-}
-const rotate = (geojson: LineString, angle=0, {pivot, mutate}:{pivot?:[number, number]|Position, mutate?:boolean} = {})=>{
-    if (mutate === false || mutate === undefined) geojson = clone(geojson);
-    const pivotCoord = pivot? (Array.isArray(pivot)? turf.point(pivot): pivot) : turf.centroid(geojson);
-    turf.coordEach(geojson, function(pointCoords){
-        // Translate point to origin
-        const translatedX = pointCoords[0] - pivotCoord.geometry.coordinates[0];
-        const translatedY = pointCoords[1] - pivotCoord.geometry.coordinates[1];
-         // Rotate the point
-        const rotatedX = translatedX * Math.cos(angle) - translatedY * Math.sin(angle);
-        const rotatedY = translatedX * Math.sin(angle) + translatedY * Math.cos(angle);
-
-        // Translate back
-        const finalX = rotatedX +  pivotCoord.geometry.coordinates[0];
-        const finalY = rotatedY + pivotCoord.geometry.coordinates[1];   
-        pointCoords[0] = finalX
-        pointCoords[1] = finalY
-    })
-    return geojson
-}
 const createKoch = () => {
     var rotationRelative = 0
     let pointer = [0,0]
@@ -158,16 +212,46 @@ const createKoch = () => {
     koch.iterate(4)
     koch.final()
     return scale(featureCollection(allLs),0.25, 0.25)
-    
 }
-export const plot = () => {
-    let feature = lineString([
-        [0, 0],
-        [0, 1],
-        [1, 1],
-        [1, 0],
-        [0, 0]
-    ])
+const mergeLine = (features:any[])=>{
+    return lineString(features.map(f=>f.coordinates).flat())
+}
+const persiana = ()=>{
+
+}
+const muntanyaFactory = ()=>{
+    
+    let line = lineString([[1,2],[2,1]])
+    let distributionUnequal = cumsum(listSummingUpTo(1, 3))
+    console.log(distributionUnequal)
+    iterGrid(4,5,(x,y)=>{
+        turf.circle()
+    })
+    return featureCollection([line,mergeLine(translateChunks(line, 1, distributionUnequal).features)])
+    let line2 = lineString([[1,1],[1,7]])
+    let angle = tu.angleBetween(tu.lineToVector(line), tu.lineToVector(line2))
+    let line3 = tu.rotate(line, angle, {pivot:[1,1]})
+    return featureCollection([line, line2])
+    return featureCollection([line, line3])
+    // console.log(tu.lineToVector(line), tu.lineToVector(line2))
+    // console.log(tu.angleBetween(tu.lineToVector(line), tu.lineToVector(line2)))
+    
+    // console.log(tu.angleBetween(tu.lineToVector(line2), tu.lineToVector(line)))
+    return featureCollection([line, line3])
+}
+export const plot = async () => {
+    let image = await Image.load('./assets/0-finestra/shadowmap.jpg')
+    let muntanya = muntanyaFactory()
+    return muntanya
+    let feature = pine()
+    // let matrix = [21,14]
+    // let allfeatures = []
+    // for (let i=0;i<matrix[0];i++){
+    //     for (let j=0;j<matrix[1];j++){
+    //         let featureTranslated = translate(feature, i, j)
+    //         allfeatures.push(featureTranslated)
+    //     } 
+    // }
     let feature2 = lineString([
         [1, 1],
         [1, 2],
@@ -175,19 +259,23 @@ export const plot = () => {
         [2, 1],
         [1, 1]
     ])
-    let feature3 = createKoch()
+    // let feature3 = createKoch()
     feature.properties = {
         lineWidth: 0.1,
         strokeStyle: "blue",
     }
     // let feature2 = turf.bezierSpline(feature,)
+    let allCollections = []
     let collections = featureCollection([
-        feature,
+        ...allfeatures
         // bballNet({})
-        feature2,
-        feature3
+        // feature2,
+        // feature3
     ])
-    return collections
+    // for(let i = 0;i<20;i++){
+    //     allCollections.push(translate(collections, i/40,i/40))
+    // }
+    // return featureCollection([feature])
 }
 export const schema = {}
 export const config = {
