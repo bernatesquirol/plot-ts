@@ -1,5 +1,6 @@
-import {featureCollection, feature, lineString, lineStrings, point, points} from '@turf/helpers'
+import {featureCollection, feature, lineString, lineStrings, point, points, polygon} from '@turf/helpers'
 export type FeatureCollection = ReturnType<typeof featureCollection>
+export type Polygon = ReturnType<typeof polygon>
 export type Feature = ReturnType<typeof feature>
 export type LineString = ReturnType<typeof lineString>
 export type LineStrings = ReturnType<typeof lineStrings>

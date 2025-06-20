@@ -1,5 +1,5 @@
 import * as turf from "@turf/turf";
-import type { LineString, Vector } from "./plotUtils";
+import type { LineString, Plottable, Point, Polygon, Vector } from "./plotUtils";
 // geometries
 export const ellipse = (center: turf.helpers.Coord, xSemiAxis: number, ySemiAxis: number, options?:{}={})=>{
     return turf.ellipse(center, xSemiAxis, ySemiAxis, {units:"degrees",...options})
@@ -114,6 +114,18 @@ export const iterateChunks = (line:LineString, cuts:number|number[], transform:(
     let newFeatures = lines.features.map((line, i, totalList)=>transform(line.geometry, i, totalList))
     return turf.featureCollection(newFeatures)
 }
+export const add = (v1:Vector, v2:Vector)=>{
+    return [v1[0]+v2[0],v1[1]+v2[1]]
+}
+export const vectFromAToB = (A: Vector, B: Vector)=>{
+    return diff(B,A)
+}
+export const diff = (B:Vector, A:Vector)=>{
+    return [B[0]-A[0],B[1]+A[1]]
+}
+export const mult = (v1:Vector, k:number)=>{
+    return [v1[0]*k,v1[1]*k]
+}
 export const angleBetween = (vec1:Vector, vec2:Vector)=>{
     const [x1, y1] = vec1;
     const [x2, y2] = vec2;
@@ -138,6 +150,13 @@ export const angleBetween = (vec1:Vector, vec2:Vector)=>{
     
     return angle;
 }
+export const pointToVec = (p: Point)=>{
+    let geometry: any = p
+    if (p.type == "Feature"){
+        geometry = p.geometry
+    }
+    return geometry.coordinates as [number,number]
+}
 /*
 let line = lineString([[1,1],[5,5]])
 let line2 = lineString([[1,1],[1,7]])
@@ -146,3 +165,37 @@ let line3 = tu.rotate(line, angle, {pivot:[1,1]})
 // return featureCollection([line, line2])
 return featureCollection([line, line3])
 */
+// RANDOM
+const geoms = (fc: any)=>{
+    let returnVal;
+    switch(fc.type){
+        case "Feature":
+            returnVal = [fc.geometry]
+            break
+        case "FeatureCollection":
+            returnVal = fc.features.map(f=>geoms(f)).flat()
+            break
+        default:
+            returnVal =  [fc]
+            break
+    }
+    return returnVal
+}
+export const getRandomPointFromShape = (includedPolygon: Polygon,excludedShapes: Polygon)=>{
+    let bbox = turf.bbox(includedPolygon)
+    let isOk = false
+    let maxIter = 1000
+    let point;
+    let gs = geoms(includedPolygon)
+    while(!isOk && maxIter>0){
+        let includedOk = true
+        point = turf.randomPoint(1, {bbox}).features[0]
+        for (let g of gs){
+            includedOk &&= turf.booleanContains(g, point)
+        }
+        let excludedOk = !excludedShapes || !turf.booleanContains(excludedShapes, point)
+        isOk = includedOk && excludedOk
+        maxIter-=1
+    }
+    return point!
+}

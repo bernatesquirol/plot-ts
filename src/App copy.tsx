@@ -10,18 +10,57 @@ import * as tldrawUtils from './utils/tldrawUtils'
 import { createRef, useEffect } from 'react'
 import { Tldraw } from 'tldraw';
 import { HelperButton } from './components/HelperButton';
-
-
+import p5 from 'p5'
+// globalThis.bind(new p5(s))
+const s = ( sketch ) => {
+  
+	sketch.setup = () => {
+	//   sketch.createCanvas(200, 200);
+	};
+  
+	sketch.draw = () => {
+	//   sketch.background(0);
+	//   sketch.fill(255);
+	//   sketch.rect(x,y,50,50);
+	};
+  };
 
 const SketchRenderer = ()=>{
 	const ref = createRef<any>();
 	useEffect(() => {
 		plot().then(plotObject=>{
-			const instructions = utils.plot2instruct(plotObject)
-			const sketch = sketchUtils.sketchBuilder(instructions)
-			canvasSketch(sketch, {
+			// const instructions = utils.plot2instruct(plotObject)
+			// const sketch = sketchUtils.sketchBuilder(instructions)
+			
+			// window.preload = ()=>{}			
+			// canvasSketch(sketch, {
+			canvasSketch(() => {
+				// Inside this is a bit like p5.js 'setup' function
+				// ...
+			  
+				// Attach events to window to receive them
+				window.mouseClicked = () => {
+				  console.log('Mouse clicked');
+				};
+			  
+				// Return a renderer to 'draw' the p5.js content
+				return ({ playhead, width, height }) => {
+				  // Draw with p5.js things
+				  P5.clear()
+				  P5.normalMaterial();
+				  P5.rotateX(playhead * 2 * PI);
+				  P5.rotateZ(playhead * 2 * PI);
+				  P5.cylinder(20, 50);
+				}
+			},{
 				...config,
-				canvas: ref.current
+				p5:true,
+				animate: true,
+				context: '2d',
+				// canvas: ref.current,
+				attributes: {
+					antialias: true
+				}
 			});
 		})
 

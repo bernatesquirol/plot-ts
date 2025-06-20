@@ -10,18 +10,25 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@bettercorp/svg-to-geojson": "^1.0.1",
+    "@d4c/numjs": "^0.17.34",
     "@turf/turf": "^7.2.0",
     "bezier-js": "^6.1.4",
     "canvas-sketch": "^0.7.7",
+    "geojson": "^0.5.0",
     "image-js": "^0.37.0",
     "lindenmayer": "^1.5.4",
     "lodash": "^4.17.21",
     "mathjs": "^14.5.2",
+    "p5": "^2.0.3",
     "probability-distributions": "^0.9.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "seedrandom": "^3.0.5",
     "simple-statistics": "^7.8.8",
+    "svg-flatten": "^1.0.1",
+    "svg-parser": "^2.0.4",
+    "svg-path-interpolator": "^0.3.0",
     "tldraw": "^3.12.1",
     "unirand": "^2.12.2",
     "zod": "^3.25.28"
@@ -29,6 +36,7 @@
   "devDependencies": {
     "@eslint/js": "^9.25.0",
     "@types/lodash": "^4.17.17",
+    "@types/p5": "^1.7.6",
     "@types/react": "^19.1.2",
     "@types/react-dom": "^19.1.2",
     "@vitejs/plugin-react": "^4.4.1",
