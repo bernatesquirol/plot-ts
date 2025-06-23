@@ -27,9 +27,13 @@ const createMovementCoords = (coordinates:any[])=>{
         return val
     })
 }
+
 export const plot2instruct = (plot:Plottable, properties={}, depth=0)=>{
     let returnList: any[] = []
     let propertiesInherit = {...properties, ...(plot.properties||{})}
+    // if (plot?.properties?.id=='bezier'){
+    //     debugger
+    // }
     if (plot.type==='FeatureCollection'){
         returnList = [...returnList, ...plot.features.flatMap(f=>plot2instruct(f, propertiesInherit, depth+1))]
     }else if (plot.type==="Feature"){

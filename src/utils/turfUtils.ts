@@ -1,5 +1,5 @@
 import * as turf from "@turf/turf";
-import type { LineString, Plottable, Point, Polygon, Vector } from "./plotUtils";
+import type { FeatureCollection, LineString, Plottable, Point, Polygon, Vector } from "./plotUtils";
 // geometries
 export const ellipse = (center: turf.helpers.Coord, xSemiAxis: number, ySemiAxis: number, options?:{}={})=>{
     return turf.ellipse(center, xSemiAxis, ySemiAxis, {units:"degrees",...options})
@@ -31,11 +31,34 @@ let line2 = tu.translate(line,-0.5)
 line2 = tu.scale(line2, 0.25,0.25)
 return featureCollection([line,line2])
 */
+export const triangleDistance = (center:Vector, closer:Vector, further:Vector)=>{
+  return distance(center, closer)<distance(center,further)
+}
+export const distance = (a:Vector, b:Vector)=>{
+    return turf.distance(a,b,{units:"degrees"})
+}
 export const vectorBetween = (p1:Vector,p2:Vector)=>{
     return [p2[0]-p1[0], p2[1]-p1[1]]
 }
-export const rotate = (geojson: LineString, angle=0, {pivot, mutate}:{pivot?:[number, number]|Position, mutate?:boolean} = {})=>{
-    if (mutate === false || mutate === undefined) geojson =  turf.clone(geojson);
+export const paintObj = (color?:string)=>{
+    return color?{ strokeStyle: color }:{}
+}
+export const paint = (feature: Plottable, color: string)=>{
+    feature.properties = {...(feature.properties||{}), ...paintObj(color)}
+    return feature
+}
+export const circle = (origin:any, radius:number=0.1, color?:string)=>{
+    return turf.circle(origin, radius, { units: "degrees", properties: paintObj(color)})
+}
+export const rotate = <T extends LineString|[number,number]>(geojson: T, angle=0, {pivot, mutate}:{pivot?:[number, number]|Position, mutate?:boolean} = {}):T=>{
+    let returnArray = false
+    if (Array.isArray(geojson)){
+        geojson = turf.lineString([[0,0],geojson])
+        pivot = turf.point([0,0])
+        returnArray=true
+    }
+    if (mutate === false || mutate === undefined) geojson =  turf.clone(geojson) as T;
+    
     const pivotCoord = pivot? (Array.isArray(pivot)? turf.point(pivot): pivot) : turf.centroid(geojson);
     turf.coordEach(geojson, function(pointCoords){
         // Translate point to origin
@@ -51,15 +74,28 @@ export const rotate = (geojson: LineString, angle=0, {pivot, mutate}:{pivot?:[nu
         pointCoords[0] = finalX
         pointCoords[1] = finalY
     })
+    if (returnArray){
+        return lastCoord(geojson)
+    }
     return geojson
 }
-
+export const firstCoord = (lineS:FeatureCollection|LineString):[number,number]=>{
+    if (lineS.type==="FeatureCollection"){
+        return firstCoord(lineS.features[0] as LineString)
+    }
+    return lineS.geometry.coordinates[0] as [number,number]
+  }
+  export const lastCoord = (lineS:FeatureCollection|LineString):[number,number]=>{
+    if (lineS.type==="FeatureCollection"){
+        return lastCoord(lineS.features[lineS.features.length-1] as LineString)
+    }
+    return lineS.geometry.coordinates[lineS.geometry.coordinates.length-1] as [number,number]
+  }
 export const unitVector = (vector:Vector)=>{
     let [nx,ny] = vector
     // Calculate the magnitude
     const magnitude = Math.sqrt(nx * nx + ny * ny);
 
-    // Return the unit normal vector
     return [nx / magnitude, ny / magnitude] as Vector;
 }
 export const lineToVector = (line: LineString,unitary:boolean=false)=>{
@@ -70,6 +106,37 @@ export const lineToVector = (line: LineString,unitary:boolean=false)=>{
         return unitVector([dx,dy])
     }
     return [dx,dy]
+}
+export const iterateChildren = (geometry:Plottable, func:(a:Plottable)=>any, typeSelected="LineString", depth:number=0):any[]=>{
+    let returnVal;
+    if (geometry.type==typeSelected){
+        returnVal = [func(geometry)] 
+    }else if (Array.isArray(geometry)){
+        returnVal = geometry.map(g=>iterateChildren(g, func, typeSelected, depth+1)).flat()
+    }else if (geometry.type==="Feature"){
+        returnVal = iterateChildren(geometry.geometry, func, typeSelected, depth+1)
+    }else if (geometry.type==="FeatureCollection"){
+        returnVal = geometry.features.map(f=>iterateChildren(f, func, typeSelected, depth+1)).flat()
+    }
+    if (!returnVal) {
+        debugger
+    }
+    if (depth == 0) {return returnVal!.flat()}
+    return returnVal!
+}
+export const mergeLines = (geometry:LineString)=>{
+    let coords = iterateChildren(geometry, (s:LineString)=>s.coordinates, "LineString")
+    // debugger
+    return turf.lineString(coords)
+}
+export const normalVector = ([dx,dy]:Vector)=>{
+    const nx = dy;
+    const ny = -dx;
+
+    return [nx,ny]
+}
+export const getBoundaryPolygon = (polygon: Polygon)=>{
+  return turf.lineString(polygon.geometry.coordinates[0])
 }
 export const lineNormalVector = (line: LineString, index: number = 0): Vector => {
     const coords = line.geometry.coordinates;
@@ -85,10 +152,7 @@ export const lineNormalVector = (line: LineString, index: number = 0): Vector =>
 
     // Calculate the normal vector (perpendicular to direction vector)
     // Rotate 90 degrees clockwise: (x,y) -> (y,-x)
-    const nx = dy;
-    const ny = -dx;
-
-    return [nx,ny]
+    return normalVector([dx,dy])
 }
 export const lineChunkQ = (line: LineString, cuts:number|number[])=>{
     let lengthLine = turf.length(line,{units:'degrees'})
@@ -151,6 +215,7 @@ export const angleBetween = (vec1:Vector, vec2:Vector)=>{
     return angle;
 }
 export const pointToVec = (p: Point)=>{
+    if (Array.isArray(p))return p
     let geometry: any = p
     if (p.type == "Feature"){
         geometry = p.geometry
@@ -181,7 +246,7 @@ const geoms = (fc: any)=>{
     }
     return returnVal
 }
-export const getRandomPointFromShape = (includedPolygon: Polygon,excludedShapes: Polygon)=>{
+export const getRandomPointFromShape = (includedPolygon: Polygon,excludedShapes?: Polygon)=>{
     let bbox = turf.bbox(includedPolygon)
     let isOk = false
     let maxIter = 1000
