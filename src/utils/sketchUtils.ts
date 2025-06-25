@@ -8,7 +8,8 @@ const completeProperties = (properties: {lineWidth?:number, strokeStyle?:string}
 type Instruction = {
 	properties: {
 		lineWidth?:number,
-		strokeStyle?:string
+		strokeStyle?:string,
+		fillStyle?:string,
 	}
 	values: {type: "moveTo"|"lineTo", value: [number,number]}[]
 }

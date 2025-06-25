@@ -79,17 +79,32 @@ export const rotate = <T extends LineString|[number,number]>(geojson: T, angle=0
     }
     return geojson
 }
+export const rewindLine = (line:LineString)=>{
+    return turf.lineString(line.geometry.coordinates.reverse())
+}
 export const firstCoord = (lineS:FeatureCollection|LineString):[number,number]=>{
     if (lineS.type==="FeatureCollection"){
         return firstCoord(lineS.features[0] as LineString)
     }
-    return lineS.geometry.coordinates[0] as [number,number]
+    let geometry;
+    if (lineS.coordinates){
+        geometry = lineS
+    }else{
+        geometry = lineS.geometry
+    }
+    return geometry.coordinates[0] as [number,number]
   }
   export const lastCoord = (lineS:FeatureCollection|LineString):[number,number]=>{
     if (lineS.type==="FeatureCollection"){
         return lastCoord(lineS.features[lineS.features.length-1] as LineString)
     }
-    return lineS.geometry.coordinates[lineS.geometry.coordinates.length-1] as [number,number]
+    let geometry;
+    if (lineS.coordinates){
+        geometry = lineS
+    }else{
+        geometry = lineS.geometry
+    }
+    return geometry.coordinates[geometry.coordinates.length-1] as [number,number]
   }
 export const unitVector = (vector:Vector)=>{
     let [nx,ny] = vector
@@ -124,9 +139,15 @@ export const iterateChildren = (geometry:Plottable, func:(a:Plottable)=>any, typ
     if (depth == 0) {return returnVal!.flat()}
     return returnVal!
 }
-export const mergeLines = (geometry:LineString)=>{
+export const loopLine = (geometry:LineString)=>{
+    return turf.lineString([...geometry.geometry.coordinates,geometry.geometry.coordinates[0]])    
+}
+export const mergeLines = (geometry:LineString, loop=false)=>{
     let coords = iterateChildren(geometry, (s:LineString)=>s.coordinates, "LineString")
     // debugger
+    if (loop){
+        coords.push(coords[0])
+    }
     return turf.lineString(coords)
 }
 export const normalVector = ([dx,dy]:Vector)=>{
@@ -173,10 +194,10 @@ export const lineChunkQ = (line: LineString, cuts:number|number[])=>{
     
 }
 
-export const iterateChunks = (line:LineString, cuts:number|number[], transform:(l:Pick<LineString,"geometry">, i:number, totalList:LineString[])=>LineString)=>{
+export const iterateChunks = (line:LineString, cuts:number|number[], transform:(l:Pick<LineString,"geometry">, i:number, totalList:LineString[])=>Plottable|Plottable[])=>{
     let lines = lineChunkQ(line, cuts)
-    let newFeatures = lines.features.map((line, i, totalList)=>transform(line.geometry, i, totalList))
-    return turf.featureCollection(newFeatures)
+    return lines.features.map((line, i, totalList)=>transform(line.geometry, i, totalList))
+    // return turf.featureCollection(newFeatures)
 }
 export const add = (v1:Vector, v2:Vector)=>{
     return [v1[0]+v2[0],v1[1]+v2[1]]
@@ -246,6 +267,7 @@ const geoms = (fc: any)=>{
     }
     return returnVal
 }
+
 export const getRandomPointFromShape = (includedPolygon: Polygon,excludedShapes?: Polygon)=>{
     let bbox = turf.bbox(includedPolygon)
     let isOk = false

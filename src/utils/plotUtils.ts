@@ -1,4 +1,5 @@
 import {featureCollection, feature, lineString, lineStrings, point, points, polygon} from '@turf/helpers'
+import { scale } from './turfUtils'
 export type FeatureCollection = ReturnType<typeof featureCollection>
 export type Polygon = ReturnType<typeof polygon>
 export type Feature = ReturnType<typeof feature>
@@ -11,9 +12,7 @@ export type Plot = (...args: any)=>Plottable
 export type Vector = [number,number]|number[]
 
 
-export const newArray = (lengthArray:number, value:number=1)=>{
-    return (new Array(lengthArray)).fill(value)
-}
+
 
 const createMovementCoords = (coordinates:any[])=>{
     return coordinates.map((c,i)=>{
@@ -51,6 +50,25 @@ export const plot2instruct = (plot:Plottable, properties={}, depth=0)=>{
         })
         
         
+        
     }
     return returnList
+}
+
+const a5 = [21.0,14.8]
+export const paperSizeFromDimensions = (settings:{dimensions:string, orientation:string})=>{
+    let [dina, orientation] = [settings.dimensions, settings.orientation]
+ let [a,size] = dina.split("")
+ let duplicateLog = 5-parseInt(size)
+ let duplicateTimes = Math.pow(2,duplicateLog)
+ let [width,height]=[a5[0]*duplicateTimes,a5[1]*duplicateTimes]
+ if (orientation=="portrait"){
+    return [height,width] 
+ }
+ return [width,height]
+}
+export const translateRelative = (geometry,config)=>{
+    let [width, height] = paperSizeFromDimensions(config)
+    console.log(width, height)
+    return scale(geometry, width, height, {pivot:[0,0]})
 }

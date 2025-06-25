@@ -17,27 +17,8 @@ import { polygonSlice } from "../utils/polygonSlice";
 const rng = seedrandom('my-seed');
 // const oldRandom = Math.random;
 Math.random = rng;
-function normalSample(mu = 0, sigma = 1) {
-    const u1 = Math.random();
-    const u2 = Math.random();
-    const z0 = Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
-    return mu + z0 * sigma;
-}
 
-// const unirand = require('unirand')
-const listSummingUpTo = (total:number, n:number, sample=()=>Math.random())=>{
-    let distribution = newArray(n).map(()=>sample())
-    let sum = distribution.reduce((acc,i)=>acc+i,0)
-    distribution = distribution.map(i=>total*i/sum)
-    return distribution
-}
-const cumsum = (arrayToSum:number[])=>{
-    let total = 0
-    return arrayToSum.map(i=>{
-        total += i
-        return total
-    })
-}
+
 const lineMergeSchema = z.object({
     lines: z.object()
 })

@@ -1,6 +1,6 @@
 import { featureCollection, lineString } from "@turf/helpers";
 import * as turf from "@turf/turf";
-import { newArray, type LineString, type Plottable, type Vector } from "../utils/plotUtils";
+import { type LineString, type Plottable, type Vector } from "../utils/plotUtils";
 import _, { random } from 'lodash'
 import * as ju from '../utils/javascriptUtils'
 import * as tu from '../utils/turfUtils'
@@ -68,7 +68,7 @@ export function svgToTurfLineStrings(svgString) {
   return lineStrings;
 }
 
-const rng = seedrandom('my-seed2');
+const rng = seedrandom('elena');
 // const oldRandom = Math.random;
 Math.random = rng;
 
@@ -309,6 +309,9 @@ const walker = (points:[number,number][], geometryFactoryNode:(point:[number,num
   })
   return allGeos
 }
+// TODO create polygons from shapes (una te un hole)
+// TODO definir punts inici / final 
+// TODO textures a cada polygon
 const randomWalker = ({
   origin,
   originDirection,
@@ -427,7 +430,51 @@ export const arc = (point, radius, startAngle=0, totalAngle=Math.PI/2,  color?:s
   }
   return gShorter
 }
-
+const pixelateLine = (line: LineString, cutsPerCm:number, amplitude:number, randomGenerator?: (i?:number)=>number)=>{
+    // let lineNormalVectorResult = lineNormalVector(line);
+    let lineNormalVectorResult = [1,0]
+    let cuts = Math.floor(turf.length(line,{units:'degrees'})*cutsPerCm)
+    let unequalCuts = ju.cumsum(ju.listSummingUpTo(1, cuts))
+    let angle = tu.angleBetween( lineNormalVectorResult, tu.lineToVector(line),)
+    if (!randomGenerator) randomGenerator = ()=>Math.random()
+      let currentPoint =tu.firstCoord(line)
+    let totalChunks = tu.mergeLines(tu.iterateChunks(line, unequalCuts, (subline, i, list)=>{
+        // let amplitudeChunk = (randomGenerator(i)*amplitude)-amplitude/2
+        let k = i%2
+        let geometry;
+        if (k==0){
+          geometry = lineString([currentPoint,[ tu.lastCoord(subline)[0], currentPoint[1]]])
+        }else{
+          geometry = lineString([currentPoint,[currentPoint[0], tu.lastCoord(subline)[1]]])
+        }
+        if (i===list.length-1){
+          let point = tu.lastCoord(geometry)
+          
+          let geo2 = lineString([point, tu.lastCoord(subline)])
+          if (turf.length(geo2, {units:'degrees'})){
+            return [geometry, geo2]
+          }
+        }
+        currentPoint = tu.lastCoord(geometry)
+        return geometry
+        let newSl = subline
+        let centroid = turf.centroid(subline)
+        if (i==0){
+            centroid = turf.point(subline.coordinates[0])
+        }else if (i==list.length-1){
+            centroid = turf.point(subline.coordinates[subline.coordinates.length-1])
+        }
+        newSl =tu.rotate(subline, -angle, {pivot: centroid})
+        // newSl = tu.translate(newSl as any, lineNormalVectorResult[0]*amplitudeChunk, lineNormalVectorResult[1]*amplitudeChunk)
+        if (i>0 && i<list.length-1){
+            newSl = tu.translate(newSl, 0, amplitudeChunk)
+        }
+        let scaleFactor = Math.cos(angle)
+        newSl = tu.scale(newSl,scaleFactor,scaleFactor, {pivot:centroid})
+        return newSl
+    }).flat())
+    return totalChunks
+}
 export const plot = async () => {
   let svgString = await loadSvg(svgSrc)
 
@@ -453,11 +500,72 @@ export const plot = async () => {
   // const features = svgtogeojson.svgToGeoJson(svgString);
   // console.log('Parsed features:', JSON.stringify(features, null, 2));
   let arcG = arc([2,2],1, Math.PI*0.1, Math.PI*1.9)
-  let r = rectangle([0, 0, 5, 5])
-  let pointsGrid = gridPoints(r, 4, 3)
+  
+  // 0 -> 0
+  // entenem que el range es 0 a 1 per cada parametric Func
+  // let lineSpline = turf.lineString((new Array(i)).fill(0).map((_,j)=>[[1,j+1], [2,j+1], [0.5,j]]).flat())
+  // turf.bezierSpline(lineSpline),
+  // return lineSplinesplit
+  // ...walk
+  let topDrawing = pu.translateRelative(lineString([[0,0],[1,0]]), config)
+  let bottomDrawing = pu.translateRelative(lineString([[0,1],[1,1]]), config)
+  let persianaLower = lineString([[0,0.1],[1,0.1]])
+  persianaLower = pu.translateRelative(persianaLower, config)
+  let skyLine = lineString([[0,0.3],[0.4,0.25],[1,0.21]])
+  let housesEllipseBoundary = tu.getBoundaryPolygon(turf.ellipse([0.5,0.38],0.35, 0.05, {units:"degrees", steps:200}))
+  let roadFirst = lineString([[0,0.45],[0.35,0.5],[1,0.53]])
+  let roadV = lineString([[0,0.5],[0.3,0.55],[0,0.6]])
+  let roadLast =  lineString([[0,0.67],[0.35,0.6],[1,0.63]])
+  let wallLine =  lineString([[0,0.8],[0.5,0.75],[1,0.75]])
+  // let line = 
+
+  ;([skyLine, housesEllipseBoundary, roadFirst, roadV, roadLast, wallLine] = [skyLine, housesEllipseBoundary, roadFirst, roadV, roadLast, wallLine].map(g=> {
+    return pixelateLine(pu.translateRelative(g, config), 3, 2)
+  }))
+  let polygonBoundary = (...lines)=>{
+    return tu.mergeLines(featureCollection(lines), true).geometry.coordinates
+  }
+  let persiana = turf.polygon([polygonBoundary(
+    topDrawing, 
+    // turf.rewind(persianaLower)
+    tu.rewindLine(persianaLower)
+  )])
+  let sky =  turf.polygon([polygonBoundary(
+    persianaLower, 
+    // tu.rewindLine(skyLine)
+    skyLine
+  )])
+  let forrest = turf.polygon([polygonBoundary(
+    skyLine, tu.rewindLine(roadFirst)
+  ),
+    housesEllipseBoundary.geometry.coordinates
+  ])
+  let housesEllipse = turf.polygon([housesEllipseBoundary.geometry.coordinates])
+  let road = turf.polygon([polygonBoundary(
+    tu.rewindLine(roadFirst),
+    tu.rewindLine(roadLast),
+    tu.rewindLine(roadV),
+  )])
+  road.properties.fillStyle = 'red'
+  let forrest2 = turf.polygon([tu.loopLine(roadV).geometry.coordinates])
+  let fields =  turf.polygon([polygonBoundary(
+    roadLast, 
+    wallLine
+  )])
+  let wall =  turf.polygon([polygonBoundary(
+    wallLine, 
+    tu.rewindLine(bottomDrawing)
+  )])
+  // console.log(line.geometry.coordinates)
+  let allGeoms = [persiana, sky, forrest,housesEllipse, road,forrest2,fields,wall]
+  let r = pu.translateRelative(rectangle([0, 0, 1, 1]), config)
+  let numCols = 25
+  let numRows = 60
+  let pointsGrid = gridPoints(r, numCols, numRows)
+  pointsGrid.forEach((row,i)=>i%2==0?row:row.reverse())
   let listPoints = pointsGrid.flat()
-  listPoints = _.shuffle(listPoints)
-  let size = 0.2
+  // listPoints = _.shuffle(listPoints)
+  let size = Math.min(5/numCols, 5/numRows)
   let walk = walker(
     listPoints,
     (point, i, acc)=>{
@@ -470,10 +578,11 @@ export const plot = async () => {
       // tu.diff(point, nextPoint, )
       // endAngle a punt next
       
-      let sizeScribble = size//Math.random()*size+size/2
-      let vectorStartPoint = tu.rotate([sizeScribble*1.1,sizeScribble*1.1], 2*Math.PI*Math.random())
+      // let sizeScribble = size//Math.random()*size+size/2
+      // let vectorStartPoint = tu.rotate([sizeScribble*1.1,sizeScribble*1.1], 2*Math.PI*Math.random())
       // let node = createCircleScribble(point, sizeScribble, tu.add(point, vectorStartPoint))!.circleLine
-      let node = arc(point, 0.25,  Math.PI*2*Math.random(), Math.PI*Math.random()+Math.PI/4,)
+      // TODO: una especie de profunditat per capes
+      let node = arc(point,size,  Math.PI*2*Math.random(), Math.PI*Math.random()+Math.PI/2,)
       let fC = tu.firstCoord(node)
       let lC = tu.lastCoord(node)
       if (nextPoint && turf.distance(fC, nextPoint)<turf.distance(lC, nextPoint)){
@@ -483,40 +592,27 @@ export const plot = async () => {
       
       return {node:featureCollection([node, ]),acc}
     },
-    (pointA, pointB, acc)=>{
-      let AtoB = tu.vectFromAToB(pointA,pointB)
-      let BtoA = tu.mult(AtoB, -1)
-      // tu.rotate(difference,)
-      let edge = bezierCurveFromVectors(pointA, pointB, AtoB, BtoA, { curviness: 0.45, })
+    (pointA, pointB, i, acc,)=>{
+      // if (i%numCols>0){
+
+        let AtoB = tu.vectFromAToB(pointA,pointB)
+        let BtoA = tu.mult(AtoB, -1)
+        // tu.rotate(difference,)
+        let edge = bezierCurveFromVectors(pointA, pointB, AtoB, BtoA, { curviness: 0.25, })
+        // return {}
+        // edge = lineString([pointA, pointB])
+        // edge = null
+        return {edge, acc}
+      // }
       // return {}
-      // let edge = 
-      return {edge, acc}
     }
   )
-  // turf.combine
-  let startPoint = tu.getRandomPointFromShape(r, turf.circle([3, 3], 1, { units: 'degrees' }))
-  if (!startPoint) return
-  let split = createCircleScribble([3, 3], 1, tu.pointToVec(startPoint)).circleLine
-  // let connection = bezierCurveFromAngles([1, 1], [4, 4], 0, - Math.PI / 2, { curviness: 0.45 })
-  let connection = bezierCurveFromVectors([1, 1], [4, 4], [1, 1], [1, 1], { curviness: 0.45, })
-  let rW = randomWalker({
-    origin: [0.1,0.1],
-    originDirection: [1,1],
-    destination: [4.9,4.9],
-    destinationDirection: [1,1],
-    polygon:r,
-    steps:2,
-    targets:15
-  })
-  // 0 -> 0
-  // entenem que el range es 0 a 1 per cada parametric Func
-  // let lineSpline = turf.lineString((new Array(i)).fill(0).map((_,j)=>[[1,j+1], [2,j+1], [0.5,j]]).flat())
-  // turf.bezierSpline(lineSpline),
-  // return lineSplinesplit
-  // ...walk
+  
   let lines = tu.mergeLines(walk)
   // let linesB = tu.translate(lines, 0, 1)
-  return featureCollection([lines, r].filter(d => d))
+  return featureCollection([...allGeoms,...walk, r].filter(d => d))
 }
+const relativeMeasurement = (config)=>{
 
+}
 export const schema = {}

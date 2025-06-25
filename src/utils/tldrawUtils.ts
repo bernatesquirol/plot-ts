@@ -1,18 +1,8 @@
 import { Arc2d, createShapeId, CubicSpline2d, Polyline2d, type TLDrawShape, Vec, type Editor, type TLGeoShape, type TLLineShape, type TLShapeId } from "tldraw";
 import * as utils from './plotUtils'
-const a5 = [210,148]
-const paperSizeFromDimensions = (dina, orientation)=>{
- let [a,size] = dina.split("")
- let duplicateLog = 5-size
- let duplicateTimes = Math.pow(2,duplicateLog)
- let [width,height]=[a5[0]*duplicateTimes,a5[1]*duplicateTimes]
- if (orientation=="landscape"){
-    return [height,width] 
- }
- return [width,height]
-}
+
 export const renderInstructions = (editor: Editor, plotObject:any, settings:any)=>{
-    let [w,h] = paperSizeFromDimensions(settings.orientation)
+    let [w,h] = utils.paperSizeFromDimensions(settings)
     const instructions = utils.plot2instruct(plotObject)
     let multiplier = 100
     const artboardId = createShapeId('artboard')
