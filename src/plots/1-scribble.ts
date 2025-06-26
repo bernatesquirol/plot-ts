@@ -565,6 +565,7 @@ export const plot = async () => {
   pointsGrid.forEach((row,i)=>i%2==0?row:row.reverse())
   let listPoints = pointsGrid.flat()
   // listPoints = _.shuffle(listPoints)
+  listPoints.filter
   let size = Math.min(5/numCols, 5/numRows)
   let walk = walker(
     listPoints,
@@ -610,7 +611,7 @@ export const plot = async () => {
   
   let lines = tu.mergeLines(walk)
   // let linesB = tu.translate(lines, 0, 1)
-  return featureCollection([...allGeoms,...walk, r].filter(d => d))
+  return featureCollection([...allGeoms, r].filter(d => d))
 }
 const relativeMeasurement = (config)=>{
 
