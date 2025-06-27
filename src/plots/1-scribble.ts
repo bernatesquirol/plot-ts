@@ -171,16 +171,17 @@ function bezierCurveFromVectors(A, B, alphaVec, betaVec, options = {}) {
 const circleAndTangents = ()=>{
 
 }
-const createCircleScribble = (center: Vector, radius: number, startingPoint: Vector) => {
+const createCircleScribble = (center: Vector, radius: number, startingPoint: Vector, startingVector:Vector, endingPoint:Vector, endingVector:Vector) => {
   let circle = turf.circle(center, radius, { units: 'degrees' })
   let finalCircleLine;
-  if (startingPoint) {
-    if (turf.booleanIntersects(circle, turf.point(startingPoint))) {
+  let midpoint = tu.pointToVec(turf.centroid(lineString([startingPoint, endingPoint])))
+  if (midpoint) {
+    if (turf.booleanIntersects(circle, turf.point(midpoint))) {
       console.log(startingPoint, circle)
       return
     }
 
-    let tangentPoints = turf.polygonTangents(startingPoint, circle).features.map(c => tu.pointToVec(c))
+    let tangentPoints = turf.polygonTangents(midpoint, circle).features.map(c => tu.pointToVec(c))
     let lineS = lineString(tangentPoints)
     lineS = tu.scale(lineS, 1.1, 1.1)
     let split = turf.lineSplit(lineString(circle.geometry.coordinates[0]), lineS)
@@ -212,18 +213,23 @@ const createCircleScribble = (center: Vector, radius: number, startingPoint: Vec
       further = g1
     }
     // further.properties = { strokeStyle: "blue" }
-    further = lineString([startingPoint, ...further.geometry.coordinates, startingPoint], further.properties)
+    // further = lineString([startingPoint, ...further.geometry.coordinates], further.properties)
     finalCircleLine = further
   }else{
     return
   }
-
+  let startCircle = tu.firstCoord(finalCircleLine)
+  let startVectorN = getTangentVector(center,startCircle )
+  
+  let finalCircle =  tu.lastCoord(finalCircleLine)
+  let lastVectorN = getTangentVector(center, tu.lastCoord(finalCircleLine))
+  let firstLeg =  bezierCurveFromVectors(startingPoint, startCircle, startingVector, startVectorN )
+  let secondLeg =  bezierCurveFromVectors(endingPoint, finalCircle, endingVector, lastVectorN )
   // firstLine =lineString(startingPoint,)
   // split.features[2].properties = {strokeStyle:"purple"}
   // console.log(cutPolygon(circle.geometry, lineS.geometry))
-  return {
-    circleLine: finalCircleLine
-  }
+  
+  return tu.mergeLines(featureCollection([firstLeg,finalCircleLine, turf.rewind(secondLeg)]))
   // console.log(split)
   console.log()
 }
@@ -244,9 +250,12 @@ const loadSvg = (url: string) => {
   return fetch(url).then(a => a.text())
 }
 
-const arrow = (point:Vector, vector:Vector, length=0.5, atStart=true, color?:string)=>{
-  let u = tu.unitVector(vector)
-  let mainV = tu.mult(u, length)
+const arrow = (point:Vector, vector:Vector, atStart=true,length?:number, color?:string)=>{
+  let mainV = vector;
+  if (length){
+    let u = tu.unitVector(vector)
+    mainV = tu.mult(u, length!)
+  }
   let startingPoint = point
   if (!atStart){
     startingPoint = tu.add(point,tu.mult(mainV,-1))
@@ -259,7 +268,7 @@ const arrow = (point:Vector, vector:Vector, length=0.5, atStart=true, color?:str
     pivot: tu.lastCoord(main)
   })//,0.25,0.25)
   let v = featureCollection([main, right, left])
-  tu.paint(v, color)
+  tu.paint(v, color||'red')
   return v
 }
 const gridPoints = (polygon, cols, rows, reverseRows=false, reverseCols=false)=>{
@@ -405,7 +414,8 @@ const iterTwo = (list)=>{
   list.slice(1).map((item,i)=>[list[i-1], item])
 }
 export const getTangentVector = (center, point)=>{
-  return tu.unitVector(tu.normalVector(tu.diff(center, point)))
+  // return tu.diff(point, center)
+  return tu.unitVector(tu.normalVector(tu.diff(point, center)))
 }
 
 export const arc = (point, radius, startAngle=0, totalAngle=Math.PI/2,  color?:string)=>{
@@ -558,6 +568,7 @@ export const plot = async () => {
   )])
   // console.log(line.geometry.coordinates)
   let allGeoms = [persiana, sky, forrest,housesEllipse, road,forrest2,fields,wall]
+  let ls = lineString([tu.getPointAlongLine(bottomDrawing, Math.random()),tu.getPointAlongLine(wallLine, Math.random())])
   let r = pu.translateRelative(rectangle([0, 0, 1, 1]), config)
   let numCols = 25
   let numRows = 60
@@ -565,55 +576,53 @@ export const plot = async () => {
   pointsGrid.forEach((row,i)=>i%2==0?row:row.reverse())
   let listPoints = pointsGrid.flat()
   // listPoints = _.shuffle(listPoints)
-  listPoints.filter
-  let size = Math.min(5/numCols, 5/numRows)
-  let walk = walker(
-    listPoints,
-    (point, i, acc)=>{
-      let prevPoint = listPoints[i-1]
-      let nextPoint = listPoints[i+1]
-      // startAngle a punt prev
-      // tu.diff(prevPoint, point)
-      
-      // tu.angleBetween([1,0], )
-      // tu.diff(point, nextPoint, )
-      // endAngle a punt next
-      
-      // let sizeScribble = size//Math.random()*size+size/2
-      // let vectorStartPoint = tu.rotate([sizeScribble*1.1,sizeScribble*1.1], 2*Math.PI*Math.random())
-      // let node = createCircleScribble(point, sizeScribble, tu.add(point, vectorStartPoint))!.circleLine
-      // TODO: una especie de profunditat per capes
-      let node = arc(point,size,  Math.PI*2*Math.random(), Math.PI*Math.random()+Math.PI/2,)
-      let fC = tu.firstCoord(node)
-      let lC = tu.lastCoord(node)
-      if (nextPoint && turf.distance(fC, nextPoint)<turf.distance(lC, nextPoint)){
-        node = turf.rewind(node)
-      }
-      // tu.circle(tu.firstCoord(node)), tu.circle(tu.lastCoord(node))
-      
-      return {node:featureCollection([node, ]),acc}
-    },
-    (pointA, pointB, i, acc,)=>{
-      // if (i%numCols>0){
-
-        let AtoB = tu.vectFromAToB(pointA,pointB)
-        let BtoA = tu.mult(AtoB, -1)
-        // tu.rotate(difference,)
-        let edge = bezierCurveFromVectors(pointA, pointB, AtoB, BtoA, { curviness: 0.25, })
-        // return {}
-        // edge = lineString([pointA, pointB])
-        // edge = null
-        return {edge, acc}
-      // }
-      // return {}
-    }
-  )
   
-  let lines = tu.mergeLines(walk)
-  // let linesB = tu.translate(lines, 0, 1)
-  return featureCollection([...allGeoms, r].filter(d => d))
-}
-const relativeMeasurement = (config)=>{
+  let size = Math.min(5/numCols, 5/numRows)
+  // let walk = walker(
+  //   listPoints,
+  //   (point, i, acc)=>{
+  //     let prevPoint = listPoints[i-1]
+  //     let nextPoint = listPoints[i+1]
+  //     // startAngle a punt prev
+  //     // tu.diff(prevPoint, point)
+      
+  //     // tu.angleBetween([1,0], )
+  //     // tu.diff(point, nextPoint, )
+  //     // endAngle a punt next
+      
+  //     // let sizeScribble = size//Math.random()*size+size/2
+  //     // let vectorStartPoint = tu.rotate([sizeScribble*1.1,sizeScribble*1.1], 2*Math.PI*Math.random())
+  //     // let node = createCircleScribble(point, sizeScribble, tu.add(point, vectorStartPoint))!.circleLine
+  //     // TODO: una especie de profunditat per capes
+  //     let node = arc(point,size,  Math.PI*2*Math.random(), Math.PI*Math.random()+Math.PI/2,)
+  //     let fC = tu.firstCoord(node)
+  //     let lC = tu.lastCoord(node)
+  //     if (nextPoint && turf.distance(fC, nextPoint)<turf.distance(lC, nextPoint)){
+  //       node = turf.rewind(node)
+  //     }
+  //     // tu.circle(tu.firstCoord(node)), tu.circle(tu.lastCoord(node))
+      
+  //     return {node:featureCollection([node, ]),acc}
+  //   },
+  //   (pointA, pointB, i, acc,)=>{
+  //     // if (i%numCols>0){
 
+  //       let AtoB = tu.vectFromAToB(pointA,pointB)
+  //       let BtoA = tu.mult(AtoB, -1)
+  //       // tu.rotate(difference,)
+  //       let edge = bezierCurveFromVectors(pointA, pointB, AtoB, BtoA, { curviness: 0.25, })
+  //       // return {}
+  //       // edge = lineString([pointA, pointB])
+  //       // edge = null
+  //       return {edge, acc}
+  //     // }
+  //     // return {}
+  //   }
+  // )
+  // createLoop(ls, center)
+  // let lines = tu.mergeLines(walk)
+  // let linesB = tu.translate(lines, 0, 1)
+  let bloops = createCircleScribble([1,1], 1, [3,2], [1,1], [2,3], [-1,-1])
+  return featureCollection([bloops,...allGeoms, ls].filter(d => d))
 }
 export const schema = {}

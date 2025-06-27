@@ -142,7 +142,7 @@ export const iterateChildren = (geometry:Plottable, func:(a:Plottable)=>any, typ
 export const loopLine = (geometry:LineString)=>{
     return turf.lineString([...geometry.geometry.coordinates,geometry.geometry.coordinates[0]])    
 }
-export const mergeLines = (geometry:LineString, loop=false)=>{
+export const mergeLines = (geometry:Plottable, loop=false)=>{
     let coords = iterateChildren(geometry, (s:LineString)=>s.coordinates, "LineString")
     // debugger
     if (loop){
@@ -193,7 +193,9 @@ export const lineChunkQ = (line: LineString, cuts:number|number[])=>{
     }
     
 }
-
+export const getPointAlongLine = (line:LineString, prop:number)=>{
+    return pointToVec(turf.along(line,turf.length(line, {units:'degrees'})*prop,{units:'degrees'}))
+}
 export const iterateChunks = (line:LineString, cuts:number|number[], transform:(l:Pick<LineString,"geometry">, i:number, totalList:LineString[])=>Plottable|Plottable[])=>{
     let lines = lineChunkQ(line, cuts)
     return lines.features.map((line, i, totalList)=>transform(line.geometry, i, totalList))
@@ -206,7 +208,7 @@ export const vectFromAToB = (A: Vector, B: Vector)=>{
     return diff(B,A)
 }
 export const diff = (B:Vector, A:Vector)=>{
-    return [B[0]-A[0],B[1]+A[1]]
+    return [B[0]-A[0],B[1]-A[1]]
 }
 export const mult = (v1:Vector, k:number)=>{
     return [v1[0]*k,v1[1]*k]
