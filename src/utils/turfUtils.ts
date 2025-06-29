@@ -118,12 +118,15 @@ export const unitVector = (vector:Vector)=>{
 }
 export const lineToVector = (line: LineString,unitary:boolean=false)=>{
     const coords = line.geometry.coordinates;
-    const dx = coords[coords.length-1][0] - coords[0][0];
-    const dy = coords[coords.length-1][1] - coords[0][1];
+    let firstP = firstCoord(line)
+    let lastP = lastCoord(line)
+    let v = diff(lastP, firstP)
+    // const dx = coords[coords.length-1][0] - coords[0][0];
+    // const dy = coords[coords.length-1][1] - coords[0][1];
     if (unitary){
-        return unitVector([dx,dy])
+        return unitVector(v)
     }
-    return [dx,dy]
+    return v
 }
 export const iterateChildren = (geometry:Plottable, func:(a:Plottable)=>any, typeSelected="LineString", depth:number=0):any[]=>{
     let returnVal;
@@ -213,6 +216,20 @@ export const add = (v1:Vector, v2:Vector)=>{
 }
 export const vectFromAToB = (A: Vector, B: Vector)=>{
     return diff(B,A)
+}
+export const mean = (...vectors:number[][])=>{
+    return vectors.reduce((acc,v)=>{
+        if (!acc.length){
+            return v
+        }else{
+            let returnVal = acc.map((v2,i)=>{
+                return v2+v[i]
+            })
+            return returnVal
+        }
+    }, []).map((v:any)=>{
+        return v/vectors.length
+    })
 }
 export const diff = (B:Vector, A:Vector)=>{
     return [B[0]-A[0],B[1]-A[1]]

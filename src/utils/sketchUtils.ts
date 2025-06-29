@@ -36,6 +36,9 @@ export const sketchBuilder = (instructions: Instruction[], _margin?: number)=>{
 				values.forEach(({type, value})=>{
 					context[type](...value)
 				})
+				// if (properties?.fillStyle){
+				// 	// context.fill();
+				// }
 				context.stroke()
 			})
 			// Gradient foreground
