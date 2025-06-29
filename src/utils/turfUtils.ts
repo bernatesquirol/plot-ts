@@ -80,7 +80,10 @@ export const rotate = <T extends LineString|[number,number]>(geojson: T, angle=0
     return geojson
 }
 export const rewindLine = (line:LineString)=>{
-    return turf.lineString(line.geometry.coordinates.reverse())
+    // if (line.type === "Feature") return rewindLine(line.geometry)
+    let values =[...line.geometry.coordinates].reverse()
+    console.log(line.geometry.coordinates, values)
+    return turf.lineString(values)
 }
 export const firstCoord = (lineS:FeatureCollection|LineString):[number,number]=>{
     if (lineS.type==="FeatureCollection"){
@@ -141,6 +144,10 @@ export const iterateChildren = (geometry:Plottable, func:(a:Plottable)=>any, typ
 }
 export const loopLine = (geometry:LineString)=>{
     return turf.lineString([...geometry.geometry.coordinates,geometry.geometry.coordinates[0]])    
+}
+export const size = (polygon)=>{
+    let [minX, minY, maxX, maxY] = turf.bbox(polygon)
+    return [maxX-minX, maxY-minY, minX, minY]
 }
 export const mergeLines = (geometry:Plottable, loop=false)=>{
     let coords = iterateChildren(geometry, (s:LineString)=>s.coordinates, "LineString")

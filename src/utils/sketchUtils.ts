@@ -1,4 +1,5 @@
 const completeProperties = (properties: {lineWidth?:number, strokeStyle?:string})=>{
+	// if (properties?.strokeStyle?.includes(":"))debugger
 	return {
 		lineWidth: 0.1,
 		strokeStyle: "red",
@@ -22,6 +23,13 @@ export const sketchBuilder = (instructions: Instruction[], _margin?: number)=>{
 			instructions.forEach(({properties, values})=>{
 				context.beginPath();
 				let props = completeProperties(properties)
+				// if (properties?.strokeStyle?.includes(":")){
+				// 	let grad = context.createLinearGradient(...values[0].value, ...values[values.length-1].value)
+				// 	let [color1,color2] = properties.strokeStyle.split(":")
+				// 	grad.addColorStop(0, color1);
+				// 	grad.addColorStop(1, color2);
+				// 	properties.strokeStyle = grad
+				// }
 				Object.entries(props).forEach(([k,v])=>{
 					context[k]=v
 				})
