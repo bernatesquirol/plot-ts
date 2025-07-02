@@ -646,14 +646,22 @@ export const plot = async () => {
     {geo:wall, num_points: 4, rows: 2, cols:3}
   ]
   let points = []
+  // allGeoms = []
+  const inscribedCircleRadius = (polygon,center?:Vector,)=>{
+    if (!center){
+      turf.centroid()
+    }
+  }
   geoms_with_data.forEach(obj=>{
     let rectangleGrid = tu.gridifyPolygon(obj.geo, obj.cols,obj.rows)
     let listFeatures = [...rectangleGrid.features]
-    for (let i=0;i<obj.num_points;i++){
-      let index = ju.getRandomBetween(0,listFeatures.length)
-      let rect = listFeatures.splice(index,1)[0]
+    // for (let i=0;i<obj.num_points;i++){
+    for (let rect of listFeatures){      let index = ju.getRandomBetween(0,listFeatures.length)
+      // let rect = listFeatures.splice(index,1)[0]
       if (rect){
-        let center = tu.pointToVec(turf.centroid(rect))
+        let realRect = tu.rectangle(turf.bbox(rect))
+        // allGeoms.push(realRect)
+        let center = tu.pointToVec(turf.centroid(realRect))
         points.push({center, geo:rect})
       }
     }
@@ -666,7 +674,8 @@ export const plot = async () => {
   //   let center = [minX+(i%2?3*w/4:w/4), minY+(i+1)*h/(l.length+1)]
   //   return center
   // })
-  let triangles = points.map(({center}, i, list)=>{
+  // allGeoms = [...allGeoms,...points.map(p=>tu.circle(p.center))]
+  let triangles = points.map(({center, geo}, i, list)=>{
     // let vector = i%2?[-1,0]:[1,0]
     // let vector = i%2?[-1,0]:[1,0]
     let v;

@@ -50,8 +50,8 @@ export const paint = (feature: Plottable, color: string)=>{
 export const circle = (origin:any, radius:number=0.1, color?:string)=>{
     return turf.circle(origin, radius, { units: "degrees", properties: paintObj(color)})
 }
-export const rectangle = ([minX, minY, maxX, maxY]: [number, number, number, number],) => {
-    let [cellHeight, cellWidth] = [maxY - minY, maxX - minX]
+export const rectangle = ([minX, minY, maxX, maxY]: [number, number, number, number],epsilon:number=0.000000001) => {
+    let [cellHeight, cellWidth] = [maxY - minY - epsilon, maxX - minX - epsilon]
     return turf.rectangleGrid([minX, minY, maxX, maxY], cellWidth, cellHeight, { units: "degrees" })
   }
 export const rotate = <T extends LineString|[number,number]>(geojson: T, angle=0, {pivot, mutate}:{pivot?:[number, number]|Position, mutate?:boolean} = {}):T=>{
