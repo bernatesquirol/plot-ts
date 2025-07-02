@@ -50,6 +50,10 @@ export const paint = (feature: Plottable, color: string)=>{
 export const circle = (origin:any, radius:number=0.1, color?:string)=>{
     return turf.circle(origin, radius, { units: "degrees", properties: paintObj(color)})
 }
+export const rectangle = ([minX, minY, maxX, maxY]: [number, number, number, number],) => {
+    let [cellHeight, cellWidth] = [maxY - minY, maxX - minX]
+    return turf.rectangleGrid([minX, minY, maxX, maxY], cellWidth, cellHeight, { units: "degrees" })
+  }
 export const rotate = <T extends LineString|[number,number]>(geojson: T, angle=0, {pivot, mutate}:{pivot?:[number, number]|Position, mutate?:boolean} = {}):T=>{
     let returnArray = false
     if (Array.isArray(geojson)){
@@ -293,7 +297,16 @@ const geoms = (fc: any)=>{
     }
     return returnVal
 }
-
+export const gridifyPolygon = (polygon: Polygon, cols:number, rows:number, epsilon:number=0.000000001)=>{
+    let bbox = turf.bbox(polygon, {units:"degrees"})
+    
+    let [minX, minY, maxX, maxY] = bbox
+    let cellWidth =(maxX-minX)/cols-epsilon
+    let cellHeight =Math.floor((maxY-minY)/rows)-epsilon
+    let rectangleGrid = turf.rectangleGrid(bbox, cellWidth, cellHeight, {units:"degrees"})
+    
+    return turf.featureCollection([...rectangleGrid.features.map(f=>turf.intersect(turf.featureCollection([polygon, f])))])
+}
 export const getRandomPointFromShape = (includedPolygon: Polygon,excludedShapes?: Polygon)=>{
     let bbox = turf.bbox(includedPolygon)
     let isOk = false

@@ -272,10 +272,7 @@ export const config = {
   units: "cm",
   orientation: "portrait"
 }
-const rectangle = ([minX, minY, maxX, maxY]: [number, number, number, number],) => {
-  let [cellHeight, cellWidth] = [maxY - minY, maxX - minX]
-  return turf.rectangleGrid([minX, minY, maxX, maxY], cellWidth, cellHeight, { units: "degrees" })
-}
+
 // getPointAtLength & apply functions
 const loadSvg = (url: string) => {
   // return fetch(url).then(r=>r.arrayBuffer()).then(b=> interpolator.processSVG(new Uint8Array(b)))
@@ -635,28 +632,51 @@ export const plot = async () => {
     wallLine, 
     tu.rewindLine(bottomDrawing)
   )])
-  wall.properties.fillStyle="blue"
+  // wall.properties.fillStyle="blue"
   // console.log(line.geometry.coordinates)
   let allGeoms = [persiana, sky, forrest,housesEllipse, road,forrest2,fields,wall]
   // let ls = lineString([])
-  let r = pu.translateRelative(rectangle([0, 0, 1, 1]), config)
+  let geoms_with_data = [ 
+    {geo: sky, num_points: 1, rows: 1, cols:3},
+    {geo: forrest, num_points: 2, rows: 2, cols:3},
+    {geo:housesEllipse, num_points: 3, rows: 2, cols:3},
+    {geo: road,num_points: 2, rows: 2, cols:3},
+    {geo:forrest2,num_points: 0, rows: 2, cols:3},
+    {geo:fields, num_points: 3, rows: 2, cols:4},
+    {geo:wall, num_points: 4, rows: 2, cols:3}
+  ]
+  let points = []
+  geoms_with_data.forEach(obj=>{
+    let rectangleGrid = tu.gridifyPolygon(obj.geo, obj.cols,obj.rows)
+    let listFeatures = [...rectangleGrid.features]
+    for (let i=0;i<obj.num_points;i++){
+      let index = ju.getRandomBetween(0,listFeatures.length)
+      let rect = listFeatures.splice(index,1)[0]
+      if (rect){
+        let center = tu.pointToVec(turf.centroid(rect))
+        points.push({center, geo:rect})
+      }
+    }
+    // allGeoms.push(rectangleGrid)
+  })
+  let r = pu.translateRelative(tu.rectangle([0, 0, 1, 1]), config)
   let [w,h, minX, minY] = tu.size(r)
   
-  let listPoints = ju.newArray(6).map((_a,i, l)=>{
-    let center = [minX+(i%2?3*w/4:w/4), minY+(i+1)*h/(l.length+1)]
-    return center
-  })
-  let triangles = listPoints.map((center, i, list)=>{
+  // let listPoints = ju.newArray(6).map((_a,i, l)=>{
+  //   let center = [minX+(i%2?3*w/4:w/4), minY+(i+1)*h/(l.length+1)]
+  //   return center
+  // })
+  let triangles = points.map(({center}, i, list)=>{
     // let vector = i%2?[-1,0]:[1,0]
     // let vector = i%2?[-1,0]:[1,0]
     let v;
     if (i==list.length-1){
       v = [Math.random(), Math.random()]
     } else if (i==0){
-      v = tu.diff(center, list[i+1])
+      v = tu.diff(center, list[i+1].center)
     } else {
-      let v1 = tu.diff(center, list[i+1])
-      let v2 = tu.diff(center, list[i+1])
+      let v1 = tu.diff(center, list[i+1].center)
+      let v2 = tu.diff(center, list[i+1].center)
       v = tu.mean(v1,v2)
     }
     // return arrow(center, vector, true, 2.5)
